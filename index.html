@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AUX Battles</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════ HOME SCREEN ═══ -->
+  <div id="screen-home" class="screen active">
+    <div class="container">
+      <div class="logo">
+        <span class="logo-icon">🎵</span>
+        <h1>AUX Battles</h1>
+        <p class="tagline">Who has the best taste in music?</p>
+      </div>
+
+      <div class="card">
+        <div class="form-group">
+          <label for="nickname-input">Your Nickname</label>
+          <input type="text" id="nickname-input" placeholder="Enter nickname..." maxlength="20" autocomplete="off">
+        </div>
+        <button id="create-room-btn" class="btn btn-primary">🎮 Create Room</button>
+        <div class="divider"><span>or join existing</span></div>
+        <div class="form-group">
+          <label for="room-code-input">Room Code</label>
+          <input type="text" id="room-code-input" placeholder="e.g. XK7P2Q" maxlength="6" autocomplete="off" style="text-transform:uppercase;letter-spacing:0.1em;">
+        </div>
+        <button id="join-room-btn" class="btn btn-secondary">🚀 Join Room</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ LOBBY SCREEN ══ -->
+  <div id="screen-lobby" class="screen">
+    <div class="container">
+      <div class="lobby-header">
+        <h2>Waiting Room</h2>
+        <div class="room-code-display">
+          <span class="code-label">Room Code</span>
+          <div class="code" id="lobby-room-code">------</div>
+          <button class="btn-icon" id="copy-code-btn" title="Copy code">📋</button>
+        </div>
+        <p class="code-hint">Share this code with friends to join!</p>
+      </div>
+
+      <div class="card">
+        <h3>Players (<span id="player-count">0</span>)</h3>
+        <div id="players-list" class="players-list"></div>
+        <div class="lobby-actions">
+          <button id="start-game-btn" class="btn btn-primary hidden">🎵 Start Game</button>
+          <p id="waiting-host-msg" class="waiting-text hidden">Waiting for host to start the game...</p>
+          <button id="leave-room-btn" class="btn btn-danger">🚪 Leave Room</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ GAME SCREEN ════ -->
+  <div id="screen-game" class="screen">
+    <div class="container">
+      <div class="game-header">
+        <div class="game-meta">
+          <div class="round-badge">Round <span id="current-round">1</span></div>
+          <div class="round-timer" id="round-timer">0:00</div>
+        </div>
+        <h2>Pick Your Song</h2>
+      </div>
+
+      <div class="theme-card card">
+        <p class="theme-label">🎯 This Round's Theme</p>
+        <h2 id="current-theme" class="theme-text"></h2>
+      </div>
+
+      <div class="card" id="submission-form">
+        <h3>Your Song Choice</h3>
+        <div class="form-group">
+          <label for="song-title">Song Title *</label>
+          <input type="text" id="song-title" placeholder="e.g. Blinding Lights" maxlength="100" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="song-artist">Artist *</label>
+          <input type="text" id="song-artist" placeholder="e.g. The Weeknd" maxlength="100" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="song-link">YouTube / Spotify Link <span class="optional">(optional — enables in-app player)</span></label>
+          <input type="url" id="song-link" placeholder="https://youtube.com/watch?v=... or spotify link">
+        </div>
+        <button id="submit-song-btn" class="btn btn-primary">🎶 Submit Song</button>
+      </div>
+
+      <div class="card hidden" id="submitted-waiting">
+        <div class="waiting-animation">🎵</div>
+        <h3>Song submitted!</h3>
+        <p class="waiting-text">Waiting for other players...</p>
+        <div id="submission-progress" class="progress-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ VOTING SCREEN ═ -->
+  <div id="screen-voting" class="screen">
+    <div class="container">
+      <div class="game-header">
+        <div class="game-meta">
+          <div class="round-badge">Round <span id="voting-round">1</span></div>
+        </div>
+        <h2>Vote for the Best!</h2>
+        <p class="theme-subtitle">🎯 <strong id="voting-theme"></strong></p>
+      </div>
+
+      <div id="songs-grid" class="songs-grid"></div>
+
+      <div class="card hidden" id="vote-submitted">
+        <div class="waiting-animation">🗳️</div>
+        <h3>Vote cast!</h3>
+        <p class="waiting-text">Waiting for other players to vote...</p>
+        <div id="vote-progress" class="progress-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ RESULTS SCREEN  -->
+  <div id="screen-results" class="screen">
+    <div class="container">
+      <div class="game-header">
+        <div class="round-badge">Round <span id="results-round">1</span> Results</div>
+      </div>
+
+      <div id="winner-banner" class="winner-card card hidden">
+        <div class="winner-fireworks">🎆</div>
+        <div class="winner-crown">👑</div>
+        <h2 id="winner-name"></h2>
+        <p id="winner-song"></p>
+        <span class="winner-sub">wins this round!</span>
+      </div>
+
+      <div id="tie-banner" class="card hidden" style="text-align:center;">
+        <div style="font-size:2.5rem;margin-bottom:8px;">🤝</div>
+        <h2>It's a Tie!</h2>
+        <p class="waiting-text">No points awarded this round.</p>
+      </div>
+
+      <div class="card">
+        <h3>Round Votes</h3>
+        <div id="results-list" class="results-list"></div>
+      </div>
+
+      <div class="card">
+        <h3>🏆 Scoreboard</h3>
+        <div id="scoreboard" class="scoreboard"></div>
+      </div>
+
+      <div class="results-actions">
+        <button id="next-round-btn" class="btn btn-primary hidden">Next Round ▶</button>
+        <button id="end-game-btn" class="btn btn-danger hidden">End Game</button>
+        <p id="results-waiting-msg" class="waiting-text hidden">Waiting for host to start next round...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ END GAME SCREEN  -->
+  <div id="screen-endgame" class="screen">
+    <div class="container">
+      <div class="logo" style="padding-top:32px;">
+        <span class="logo-icon">🏆</span>
+        <h1>Game Over!</h1>
+      </div>
+      <div class="champion-card card">
+        <div class="winner-crown">👑</div>
+        <p class="champion-label">Champion</p>
+        <h1 id="champion-name"></h1>
+        <p id="champion-score" class="waiting-text"></p>
+      </div>
+      <div class="card">
+        <h3>Final Scoreboard</h3>
+        <div id="final-scoreboard" class="scoreboard"></div>
+      </div>
+      <button id="play-again-btn" class="btn btn-primary">🎮 Play Again</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ TOAST / LOADING ══ -->
+  <div id="toast" class="toast hidden"></div>
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="spinner"></div>
+    <p id="loading-text">Loading...</p>
+  </div>
+
+  <!-- canvas-confetti for winner celebration -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
