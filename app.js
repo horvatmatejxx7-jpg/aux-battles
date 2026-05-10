@@ -32,22 +32,24 @@ let _confettiFired = false;
 window.addEventListener('DOMContentLoaded', () => {
   S.db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   bindUI();
-  const saved = JSON.parse(localStorage.getItem('aux_session') || 'null');
-  if (saved) resumeSession(saved);
+  // Always start on home screen — clear any leftover session
+  clearSession();
+  loadLeaderboard();
 });
 
 function bindUI() {
-  on('create-room-btn', 'click', createRoom);
-  on('join-room-btn',   'click', joinRoom);
-  on('room-code-input', 'keypress', e => e.key === 'Enter' && joinRoom());
-  on('nickname-input',  'keypress', e => e.key === 'Enter' && createRoom());
-  on('start-game-btn',  'click', startGame);
-  on('leave-room-btn',  'click', leaveRoom);
-  on('copy-code-btn',   'click', copyCode);
-  on('submit-song-btn', 'click', submitSong);
-  on('next-round-btn',  'click', nextRound);
-  on('end-game-btn',    'click', endGame);
-  on('play-again-btn',  'click', () => location.reload());
+  on('create-room-btn',  'click', createRoom);
+  on('join-room-btn',    'click', joinRoom);
+  on('room-code-input',  'keypress', e => e.key === 'Enter' && joinRoom());
+  on('nickname-input',   'keypress', e => e.key === 'Enter' && createRoom());
+  on('start-game-btn',   'click', startGame);
+  on('leave-room-btn',   'click', leaveRoom);
+  on('copy-code-btn',    'click', copyCode);
+  on('submit-song-btn',  'click', submitSong);
+  on('next-round-btn',   'click', nextRound);
+  on('end-game-btn',     'click', endGame);
+  on('play-again-btn',   'click', () => location.reload());
+  on('refresh-lb-btn',   'click', loadLeaderboard);
 }
 
 // ── Session ───────────────────────────────────────────────────
@@ -630,6 +632,52 @@ function fireConfetti(big = false) {
   if (big) {
     setTimeout(() => confetti({ ...opts, origin: { x: 0.2, y: 0.6 } }), 400);
     setTimeout(() => confetti({ ...opts, origin: { x: 0.8, y: 0.6 } }), 700);
+  }
+}
+
+// ── Global leaderboard ────────────────────────────────────────
+// Fetches all player rows across all rooms, aggregates wins by nickname,
+// and renders the top 10 on the home screen.
+async function loadLeaderboard() {
+  const el = get('leaderboard-list');
+  if (!el) return;
+  el.innerHTML = '<div class="lb-loading">Loading...</div>';
+
+  try {
+    // Fetch every player row that has at least 1 point
+    const { data, error } = await S.db
+      .from('players')
+      .select('nickname, score')
+      .gt('score', 0);
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      el.innerHTML = '<div class="lb-empty">No scores yet — be the first to win! 🎵</div>';
+      return;
+    }
+
+    // Aggregate total points per nickname (client-side)
+    const agg = {};
+    data.forEach(p => {
+      const key = p.nickname.trim();
+      agg[key] = (agg[key] || 0) + p.score;
+    });
+
+    // Sort and take top 10
+    const top = Object.entries(agg)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    const medals = ['🥇', '🥈', '🥉'];
+    el.innerHTML = top.map(([name, pts], i) => `
+      <div class="lb-row">
+        <span class="lb-rank">${medals[i] || `${i + 1}.`}</span>
+        <span class="lb-name">${esc(name)}</span>
+        <span class="lb-pts">${pts} pt${pts !== 1 ? 's' : ''}</span>
+      </div>`).join('');
+  } catch (_) {
+    el.innerHTML = '<div class="lb-empty">Could not load leaderboard.</div>';
   }
 }
 
