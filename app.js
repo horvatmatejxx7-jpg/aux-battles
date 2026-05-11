@@ -448,7 +448,6 @@ function updatePlayerVisibility(screenName) {
   if (!player) return;
   if (screenName === 'lobby') {
     player.classList.remove('hidden');
-    if (!_userPaused) playLobbyMusic();  // autoplay only if user hasn't manually stopped
   } else {
     player.classList.remove('hidden'); // keep visible so user can control
   }
