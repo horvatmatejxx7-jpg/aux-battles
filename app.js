@@ -5,6 +5,7 @@
 // ============================================================
 
 const THEMES = [
+  // Classic vibes
   'Sunset on the beach 🌅', 'Late night drive 🚗', 'First heartbreak 💔',
   'Summer party 🎉', 'Main character moment ✨', 'Rainy day ☔',
   'Gym motivation 💪', 'Road trip with friends 🛣️', 'Villain arc 😈',
@@ -14,6 +15,17 @@ const THEMES = [
   'Best friend vibes 👯', 'Running away from problems 🏃', 'Winning moment 🏆',
   'Pre-game hype 🏟️', 'Heartbreak hotel 🏨', 'Driving into the sunset 🌇',
   'Feeling unstoppable 💥', 'Sad girl/boy hours 🌧️',
+  // Underground / niche
+  'Underground artist nobody knows yet 🕳️', '3am and can\'t sleep 🛌',
+  'Driving through the city alone at night 🌆', 'That one song that hits different 🎧',
+  'When you\'re in your feels fr 😶', 'Song for a broken situationship 💀',
+  'Nettspend/Osamason type beat 🌫️', 'That low-fi plug nobody told you about 📻',
+  'Alt girl/boy playlist 🖤', 'Basement show energy 🎸',
+  'Song you\'d put on a burner phone playlist 📱', 'Outro track energy 🌃',
+  'The song you play when nobody\'s watching 👁️', 'SoundCloud era banger 💿',
+  'Heartbreak but make it drill 🔫', 'Song that lives in your head rent free 🧠',
+  'Hidden gem — under 1k streams 💎', 'When the aux gets passed to the right person 🎵',
+  'Sad banger (it goes hard but you\'re crying) 😭🔥', 'Outro for when summer ends 🌙',
 ];
 
 // ── State ────────────────────────────────────────────────────
