@@ -422,6 +422,7 @@ function sfx(type) {
 let _lobbyMusicPlaying = false;
 let _muted             = false;
 let _lastVolume        = 0.4;
+let _userPaused        = false;  // true if user explicitly stopped music
 
 function initMusicPlayer() {
   const audio = get('lobby-audio');
@@ -435,7 +436,7 @@ function updatePlayerVisibility(screenName) {
   if (!player) return;
   if (screenName === 'lobby') {
     player.classList.remove('hidden');
-    playLobbyMusic();                  // autoplay when entering lobby
+    if (!_userPaused) playLobbyMusic();  // autoplay only if user hasn't manually stopped
   } else {
     player.classList.remove('hidden'); // keep visible so user can control
   }
@@ -451,16 +452,22 @@ function playLobbyMusic() {
   }
 }
 
-function pauseLobbyMusic() {
+function pauseLobbyMusic(byUser = false) {
   const audio = get('lobby-audio');
   if (!audio) return;
   audio.pause();
   _lobbyMusicPlaying = false;
+  if (byUser) _userPaused = true;
   updatePlayerUI();
 }
 
 function toggleLobbyMusic() {
-  _lobbyMusicPlaying ? pauseLobbyMusic() : playLobbyMusic();
+  if (_lobbyMusicPlaying) {
+    pauseLobbyMusic(true);
+  } else {
+    _userPaused = false;
+    playLobbyMusic();
+  }
 }
 
 function setVolume(val) {
