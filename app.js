@@ -25,16 +25,20 @@ const S = {
   roundStartTime: null,
 };
 
-let _timerInterval = null;
-let _confettiFired = false;
+let _timerInterval  = null;
+let _confettiFired  = false;
+let _audioCtx       = null;   // Web Audio API context for SFX
+const ROUND_SECONDS = 60;     // Countdown duration for song submission
 
 // ── Startup ──────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   S.db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   bindUI();
-  // Always start on home screen — clear any leftover session
-  clearSession();
+  initMusicPlayer();
+  clearSession();         // Always start on home screen
   loadLeaderboard();
+  // Show player widget on home screen too
+  get('music-player')?.classList.remove('hidden');
 });
 
 function bindUI() {
@@ -50,6 +54,9 @@ function bindUI() {
   on('end-game-btn',     'click', endGame);
   on('play-again-btn',   'click', () => location.reload());
   on('refresh-lb-btn',   'click', loadLeaderboard);
+  on('mp-play-btn',      'click', toggleLobbyMusic);
+  on('mp-vol-icon',      'click', toggleMute);
+  on('mp-volume',        'input', e => setVolume(parseFloat(e.target.value)));
 }
 
 // ── Session ───────────────────────────────────────────────────
@@ -168,9 +175,12 @@ async function loadRoom() {
 }
 
 async function loadPlayers() {
+  const prevCount = S.players.length;
   const { data } = await S.db.from('players').select('*')
     .eq('room_id', S.roomId).eq('is_active', true).order('created_at');
   if (data) {
+    // Play join sound when a new player appears in the lobby
+    if (data.length > prevCount && S.room?.status === 'lobby') sfx('join');
     S.players = data;
     const me = data.find(p => p.id === S.playerId);
     if (me) { S.isHost = me.is_host; saveSession(); }
@@ -243,6 +253,7 @@ async function submitSong() {
 
   if (error) { toast('Submission failed.', 'error'); return; }
   S.mySubmissionId = data.id;
+  sfx('submit');
   get('submission-form').classList.add('hidden');
   get('submitted-waiting').classList.remove('hidden');
   await loadSubmissions();
@@ -268,6 +279,7 @@ async function castVote(submissionId) {
   hideLoading();
   if (error) { toast('Vote failed.', 'error'); return; }
   S.hasVoted = true;
+  sfx('vote');
   get('songs-grid').classList.add('hidden');
   get('vote-submitted').classList.remove('hidden');
   await loadVotes();
@@ -325,19 +337,170 @@ function copyCode() {
   });
 }
 
-// ── Round timer (client-side count-up) ────────────────────────
+// ── Countdown timer ───────────────────────────────────────────
 function startTimer() {
   S.roundStartTime = Date.now();
   clearInterval(_timerInterval);
-  _timerInterval = setInterval(() => {
-    const el = get('round-timer');
-    if (!el) return;
-    const s = Math.floor((Date.now() - S.roundStartTime) / 1000);
-    el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+  const el = get('round-timer');
+  if (el) { el.textContent = `${Math.floor(ROUND_SECONDS/60)}:${String(ROUND_SECONDS%60).padStart(2,'0')}`; el.classList.remove('danger'); }
+
+  _timerInterval = setInterval(async () => {
+    const elapsed   = Math.floor((Date.now() - S.roundStartTime) / 1000);
+    const remaining = ROUND_SECONDS - elapsed;
+    const timerEl   = get('round-timer');
+
+    if (remaining <= 0) {
+      clearInterval(_timerInterval);
+      if (timerEl) { timerEl.textContent = '0:00'; timerEl.classList.add('danger'); }
+      // Host auto-advances to voting when time runs out
+      if (S.isHost && S.room?.status === 'submitting') {
+        await S.db.from('rooms').update({ status: 'voting' }).eq('id', S.roomId);
+      }
+      return;
+    }
+
+    if (timerEl) {
+      timerEl.textContent = `${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')}`;
+      if (remaining <= 10) {
+        timerEl.classList.add('danger');
+        sfx('tick');                         // tick every second in last 10s
+      } else {
+        timerEl.classList.remove('danger');
+      }
+    }
   }, 1000);
 }
 
 function stopTimer() { clearInterval(_timerInterval); }
+
+// ── Sound effects (Web Audio API — no external files) ─────────
+function getAudioCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return _audioCtx;
+}
+
+// Play a single tone
+function tone(freq, dur, type = 'sine', vol = 0.25) {
+  try {
+    const ctx  = getAudioCtx();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start(); osc.stop(ctx.currentTime + dur);
+  } catch (_) {}
+}
+
+// Named sound effects
+function sfx(type) {
+  switch (type) {
+    case 'start':   // ascending fanfare — game begins
+      tone(392, 0.12); setTimeout(() => tone(523, 0.12), 130); setTimeout(() => tone(659, 0.3), 260); break;
+    case 'submit':  // positive double-beep — song submitted
+      tone(523, 0.1); setTimeout(() => tone(659, 0.15), 110); break;
+    case 'vote':    // single mid beep — vote cast
+      tone(440, 0.18, 'sine', 0.2); break;
+    case 'win':     // victory jingle — you won the round
+      tone(523, 0.09); setTimeout(() => tone(659, 0.09), 100);
+      setTimeout(() => tone(784, 0.09), 200); setTimeout(() => tone(1047, 0.35), 300); break;
+    case 'lose':    // descending — someone else won
+      tone(400, 0.18); setTimeout(() => tone(330, 0.18), 190); setTimeout(() => tone(262, 0.35), 380); break;
+    case 'tick':    // quiet click — last 10 seconds
+      tone(880, 0.04, 'square', 0.08); break;
+    case 'join':    // soft ding — new player joined
+      tone(587, 0.15, 'sine', 0.15); break;
+    case 'end':     // final victory chord
+      tone(523, 0.5); tone(659, 0.5); tone(784, 0.5); tone(1047, 0.7); break;
+  }
+}
+
+// ── Lobby music player ────────────────────────────────────────
+let _lobbyMusicPlaying = false;
+let _muted             = false;
+let _lastVolume        = 0.4;
+
+function initMusicPlayer() {
+  const audio = get('lobby-audio');
+  if (!audio) return;
+  audio.volume = _lastVolume;
+}
+
+// Show or hide the player widget based on current screen
+function updatePlayerVisibility(screenName) {
+  const player = get('music-player');
+  if (!player) return;
+  if (screenName === 'lobby') {
+    player.classList.remove('hidden');
+    playLobbyMusic();                  // autoplay when entering lobby
+  } else {
+    player.classList.remove('hidden'); // keep visible so user can control
+  }
+}
+
+function playLobbyMusic() {
+  const audio = get('lobby-audio');
+  if (!audio) return;
+  const promise = audio.play();
+  if (promise !== undefined) {
+    promise.then(() => { _lobbyMusicPlaying = true; updatePlayerUI(); })
+           .catch(() => { _lobbyMusicPlaying = false; updatePlayerUI(); }); // autoplay blocked
+  }
+}
+
+function pauseLobbyMusic() {
+  const audio = get('lobby-audio');
+  if (!audio) return;
+  audio.pause();
+  _lobbyMusicPlaying = false;
+  updatePlayerUI();
+}
+
+function toggleLobbyMusic() {
+  _lobbyMusicPlaying ? pauseLobbyMusic() : playLobbyMusic();
+}
+
+function setVolume(val) {
+  const audio = get('lobby-audio');
+  if (!audio) return;
+  _lastVolume = val;
+  audio.volume = val;
+  _muted = val === 0;
+  updateVolIcon(val);
+}
+
+function toggleMute() {
+  const audio = get('lobby-audio');
+  const slider = get('mp-volume');
+  if (!audio || !slider) return;
+  if (_muted) {
+    audio.volume = _lastVolume || 0.4;
+    slider.value = audio.volume;
+    _muted = false;
+  } else {
+    _lastVolume = audio.volume;
+    audio.volume = 0;
+    slider.value = 0;
+    _muted = true;
+  }
+  updateVolIcon(audio.volume);
+}
+
+function updateVolIcon(vol) {
+  const icon = get('mp-vol-icon');
+  if (!icon) return;
+  icon.textContent = vol === 0 ? '🔇' : vol < 0.4 ? '🔉' : '🔊';
+}
+
+function updatePlayerUI() {
+  const btn  = get('mp-play-btn');
+  const bars = get('mp-bars');
+  if (btn)  btn.textContent = _lobbyMusicPlaying ? '⏸' : '▶';
+  if (bars) bars.classList.toggle('playing', _lobbyMusicPlaying);
+}
 
 // ── Embed parser ──────────────────────────────────────────────
 // Converts YouTube / Spotify URLs into embeddable iframe URLs
@@ -438,10 +601,12 @@ function routeToScreen() {
 
 function showScreen(name) {
   if (name !== 'game') stopTimer();
-  if (name === 'game')    { S.mySubmissionId = null; S.hasVoted = false; S.votingOrder = []; _confettiFired = false; }
+  if (name === 'game')    { S.mySubmissionId = null; S.hasVoted = false; S.votingOrder = []; _confettiFired = false; sfx('start'); }
   if (name === 'results') { _confettiFired = false; }
+  if (name !== 'lobby')   { pauseLobbyMusic(); }
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   get(`screen-${name}`).classList.add('active');
+  updatePlayerVisibility(name);
   renderScreen();
 }
 
@@ -555,10 +720,13 @@ function renderResults() {
     get('winner-name').textContent = wBy;
     get('winner-song').textContent = `"${w.song_title}" by ${w.artist}`;
     winBanner.classList.remove('hidden'); tieBanner.classList.add('hidden');
-    // 🎊 Confetti — fire once per results reveal
+    // 🎊 Confetti + SFX — fire once per results reveal
     if (!_confettiFired) {
       _confettiFired = true;
       fireConfetti();
+      // Win SFX if you won, lose SFX if someone else won
+      const roundWinner = S.submissions.find(s => s.id === winners[0].id);
+      sfx(roundWinner?.player_id === S.playerId ? 'win' : 'lose');
     }
   } else {
     winBanner.classList.add('hidden'); tieBanner.classList.remove('hidden');
@@ -589,8 +757,7 @@ function renderEndGame() {
     get('champion-score').textContent = `${champ.score} point${champ.score !== 1 ? 's' : ''}`;
   }
   renderScoreboard('final-scoreboard');
-  // Big confetti for game over
-  setTimeout(() => fireConfetti(true), 300);
+  setTimeout(() => { fireConfetti(true); sfx('end'); }, 300);
 }
 
 function renderScoreboard(id) {
